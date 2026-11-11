@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ExtractedDocument",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["vendor_name", "date", "currency", "line_items", "subtotal", "tax", "total"],
+  "properties": {
+    "vendor_name": {"type": ["string", "null"]},
+    "date": {"type": ["string", "null"], "description": "ISO 8601 date, YYYY-MM-DD"},
+    "currency": {"type": ["string", "null"], "description": "ISO 4217 code when known"},
+    "line_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["description", "quantity", "unit_price", "amount"],
+        "properties": {
+          "description": {"type": ["string", "null"]},
+          "quantity": {"type": ["number", "null"]},
+          "unit_price": {"type": ["number", "null"]},
+          "amount": {"type": ["number", "null"]}
+        }
+      }
+    },
+    "subtotal": {"type": ["number", "null"]},
+    "tax": {"type": ["number", "null"]},
+    "total": {"type": ["number", "null"]}
+  }
+}

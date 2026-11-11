@@ -1,0 +1,4 @@
+Extract the data from this receipt or invoice.
+Return JSON only, with exactly these keys: vendor_name, date, currency, line_items, subtotal, tax, total.
+line_items is a list of objects with keys: description, quantity, unit_price, amount.
+Use YYYY-MM-DD for the date. Use numbers without currency symbols. Use null for anything not shown on the document.

@@ -1,0 +1,7 @@
+extends: ../base.yaml
+paths:
+  data: /Volumes/main/docextract/data
+  artifacts: /Volumes/main/docextract/artifacts
+tracking:
+  uri: databricks
+  experiment: /Shared/invoice-receipt-extraction

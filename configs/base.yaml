@@ -1,0 +1,107 @@
+# Every tunable parameter lives here. Platform files under configs/platform/ extend this.
+paths:
+  data: data
+  artifacts: artifacts
+
+data:
+  seed: 13
+  version: data-v1
+  max_train_samples: null
+  max_eval_samples: null
+  datasets:
+    cord:
+      dataset_id: naver-clova-ix/cord-v2     # verify in T-02
+      revision: 7f0115a4b758a71d6473b8d085751692da2fef98   # pinned T-02
+      fields: [line_items, subtotal, tax, total]   # CORD labels no vendor, date or currency
+      unscored_if_null: []                   # null subtotal/tax means absent, so predictions there are scored
+    sroie:
+      dataset_id: jsdnrs/ICDAR2019-SROIE     # published test split only (361)
+      revision: bffe40c26759f3376ec2b3ae9031dbba54cd587c
+      eval_only: true                        # writes data/processed/test_sroie.jsonl; never used for training
+      fields: [vendor_name, date, total]
+      unscored_if_null: [vendor_name, date, total]   # null gold = unknown (ambiguous date), not absent
+
+prompt:
+  file: configs/prompt.txt                   # shared instruction; the fine-tuned model's prompt starts from it
+  schema_file: schema/document.schema.json   # appended to the baseline prompt (spec 03 §5)
+
+model:
+  base_id: Qwen/Qwen2.5-VL-3B-Instruct       # licence qwen-research: see docs/model_card.md
+  revision: 66285546d2b821cf421d4f5eb2576359d3770cd3   # pinned T-02
+  load_in_4bit: true
+  max_image_pixels: 1003520                  # about 1280 x 784
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: [q_proj, k_proj, v_proj, o_proj]   # confirm module names for the chosen model
+
+train:
+  seed: 13
+  device: auto
+  epochs: 3
+  batch_size: 2
+  effective_batch_size: 16
+  lr: 1.0e-4
+  weight_decay: 0.0
+  max_grad_norm: 1.0
+  gradient_checkpointing: true     # trades speed for memory; needed on small GPUs
+  max_steps: null                  # stop after N optimizer steps (smoke runs)
+  warmup_ratio: 0.05
+  eval_every_steps: 100
+  eval_subset: 50
+  log_every_steps: 10
+  save_every_steps: 100
+
+predict:
+  batch_size: 4
+  split: test
+  max_new_tokens: 1024
+  constrained: true
+
+eval:
+  amount_tolerance: 0.01
+  key_fields: [vendor_name, date, total]
+
+routing:
+  select: validation            # validation | fixed
+  confidence_threshold: 0.90    # used when select = fixed
+  target_precision: 0.98
+  required_checks: [schema_valid, total_ok]
+  allow_missing_checks: [items_sum_ok, date_ok]
+  escalate_to_baseline: false
+
+baseline:
+  model: claude-opus-5-5        # expensive zero-shot comparison model
+  effort: medium                # Opus 5.5 default effort, set explicitly
+  max_tokens: 16000
+  refusal_fallback: true        # server-side fallback if a safety classifier declines; the served model is logged
+  cache_dir: baseline_cache     # under paths.artifacts; keyed by model, prompt hash, image hash
+  usd_per_1m_input_tokens: 4.0  # Anthropic list price for claude-opus-5-5, from the API docs of 2026-11-03: re-check
+  usd_per_1m_output_tokens: 20.0
+
+cost:
+  gpu_usd_per_hour: 0.80        # replace with your actual rate
+  small_docs_per_second: null   # filled from measured throughput
+  baseline_usd_per_doc: null    # filled from the baseline run
+
+business:
+  docs_per_month: 20000
+  manual_minutes_per_doc: 3
+  review_minutes_per_doc: 1
+  clerk_usd_per_hour: 20
+  undetected_error_usd: 15
+
+feedback:
+  predictions_log: feedback/predictions_log.jsonl
+  review_queue: feedback/review_queue.csv
+  review_page: feedback/review.html          # local review page built from the queue (T-15)
+  corrections: feedback/corrections.jsonl
+  include_confirmed: false      # also train on reviewer-confirmed 'correct' predictions
+  review_threshold: 0.90
+  audit_rate: 0.05
+
+tracking:
+  uri: null
+  experiment: invoice-receipt-extraction

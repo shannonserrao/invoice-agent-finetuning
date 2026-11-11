@@ -1,0 +1,26 @@
+# Databricks Asset Bundle template. Validate against your workspace before use:
+#   databricks bundle validate -t dev
+bundle:
+  name: invoice-receipt-extraction
+
+targets:
+  dev:
+    mode: development
+    workspace:
+      host: https://<your-workspace>.cloud.databricks.com
+
+resources:
+  jobs:
+    train_job:
+      name: invoice-receipt-extraction-train
+      job_clusters:
+        - job_cluster_key: gpu
+          new_cluster:
+            spark_version: <ml-gpu-runtime-version>
+            node_type_id: <gpu-node-type>
+            num_workers: 0
+      tasks:
+        - task_key: pipeline
+          job_cluster_key: gpu
+          spark_python_task:
+            python_file: ../../platforms/databricks/run.py

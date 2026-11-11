@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+data/*
+!data/manifest.json
+!data/.gitkeep
+artifacts/*
+!artifacts/.gitkeep
+mlruns/
+feedback/review_queue.csv
+feedback/review.html
+feedback/reviewed.csv
+feedback/predictions_log.jsonl

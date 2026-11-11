@@ -1,0 +1,77 @@
+{
+  "corrections_applied": [],
+  "corrections_excluded": {},
+  "data_version": "data-v1",
+  "gold_arithmetic": {
+    "test": {
+      "items_sum_ok": {
+        "applicable": 62,
+        "pass_rate": 0.871
+      },
+      "total_ok": {
+        "applicable": 63,
+        "pass_rate": 0.6825
+      }
+    },
+    "test_sroie": {
+      "items_sum_ok": {
+        "applicable": 0,
+        "pass_rate": null
+      },
+      "total_ok": {
+        "applicable": 0,
+        "pass_rate": null
+      }
+    },
+    "train": {
+      "items_sum_ok": {
+        "applicable": 510,
+        "pass_rate": 0.851
+      },
+      "total_ok": {
+        "applicable": 512,
+        "pass_rate": 0.6758
+      }
+    },
+    "validation": {
+      "items_sum_ok": {
+        "applicable": 65,
+        "pass_rate": 0.8154
+      },
+      "total_ok": {
+        "applicable": 64,
+        "pass_rate": 0.7031
+      }
+    }
+  },
+  "images_sha256": "5d2a235c7a7cb47a7f6509672f1a58cd98d8921e6bf2d69955c73262bf43bfd1",
+  "seed": 13,
+  "sources": {
+    "cord": {
+      "dataset_id": "naver-clova-ix/cord-v2",
+      "revision": "7f0115a4b758a71d6473b8d085751692da2fef98"
+    },
+    "sroie": {
+      "dataset_id": "jsdnrs/ICDAR2019-SROIE",
+      "revision": "bffe40c26759f3376ec2b3ae9031dbba54cd587c"
+    }
+  },
+  "splits": {
+    "test": {
+      "rows": 100,
+      "sha256": "33ae76cccf952006e7333dc65a893e2bc26a701b40eb71e842fbdfdc1454430d"
+    },
+    "test_sroie": {
+      "rows": 361,
+      "sha256": "b1f2e6fe2761aa12e4bab7dc6c459e4a2c90bae7b6fb5b588f296f3418f0a165"
+    },
+    "train": {
+      "rows": 800,
+      "sha256": "a7832776040b178cfaa44a66cf1a98baea234d29e2dc45e5ccfbf3f8670e9ad1"
+    },
+    "validation": {
+      "rows": 100,
+      "sha256": "159597bfec6b8b51c3a13593540feee574ed468513e4dfa2010eb98ce59a40e5"
+    }
+  }
+}

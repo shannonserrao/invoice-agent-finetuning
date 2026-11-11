@@ -1,0 +1,7 @@
+extends: ../base.yaml
+paths:
+  artifacts: /content/drive/MyDrive/invoice-receipt-extraction/artifacts
+tracking:
+  uri: file:/content/drive/MyDrive/invoice-receipt-extraction/mlruns
+train:
+  save_every_steps: 200

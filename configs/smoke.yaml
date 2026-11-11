@@ -1,0 +1,11 @@
+# Tiny CPU run used by `make smoke` to check the wiring end to end.
+extends: base.yaml
+data:
+  max_train_samples: 64
+  max_eval_samples: 32
+train:
+  epochs: 1
+  batch_size: 8
+  device: cpu
+tracking:
+  experiment: invoice-receipt-extraction-smoke

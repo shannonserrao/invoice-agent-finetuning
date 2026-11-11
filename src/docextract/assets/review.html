@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Document review</title>
+<style>
+  :root {
+    --bg: #f6f6f4; --panel: #ffffff; --text: #1d1d1b; --muted: #6a6a66; --line: #dcdcd6;
+    --accent: #2459d6; --accent-text: #ffffff; --ok: #1f7a3d; --bad: #b3261e; --warn: #8a5a00;
+    --ok-bg: #e4f3e8; --bad-bg: #fbe6e4; --warn-bg: #fdf0d5; --code-bg: #fbfbfa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151514; --panel: #1f1f1d; --text: #ecece8; --muted: #9a9a94; --line: #36362f;
+      --accent: #7aa2ff; --accent-text: #0d1424; --ok: #6fd08c; --bad: #ff8a80; --warn: #f2c260;
+      --ok-bg: #1c3324; --bad-bg: #3b1f1d; --warn-bg: #3a2e12; --code-bg: #181816;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 2; display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center;
+           padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 16px; margin: 0 8px 0 0; }
+  label { font-size: 13px; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+  input[type=text], select, textarea {
+    font: inherit; color: var(--text); background: var(--code-bg); border: 1px solid var(--line);
+    border-radius: 6px; padding: 6px 8px; }
+  button { font: inherit; cursor: pointer; border: 1px solid var(--line); background: var(--panel); color: var(--text);
+           border-radius: 6px; padding: 6px 12px; }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px; }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .progress { margin-left: auto; color: var(--muted); font-size: 13px; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; padding: 16px; }
+  @media (max-width: 860px) { main { grid-template-columns: minmax(0, 1fr); } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px; min-width: 0; }
+  .imgwrap { max-height: 78vh; overflow: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--code-bg); }
+  .imgwrap img { display: block; width: 100%; cursor: zoom-in; }
+  .imgwrap.actual img { width: auto; max-width: none; cursor: zoom-out; }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+  .tag { padding: 1px 8px; border-radius: 99px; background: var(--warn-bg); color: var(--warn); }
+  .tag.audit { background: var(--ok-bg); color: var(--ok); }
+  textarea { width: 100%; min-height: 46vh; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px;
+             resize: vertical; tab-size: 2; }
+  .errors { margin: 8px 0 0; padding: 8px 12px 8px 28px; background: var(--bad-bg); color: var(--bad);
+            border-radius: 6px; font-size: 13px; }
+  .errors:empty { display: none; }
+  .verdicts { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 8px; }
+  .verdicts button[aria-pressed=true] { color: #fff; border-color: transparent; }
+  #v-correct[aria-pressed=true] { background: var(--ok); }
+  #v-incorrect[aria-pressed=true] { background: var(--bad); }
+  #v-unsure[aria-pressed=true] { background: var(--warn); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 8px; }
+  .row input[type=text] { flex: 1 1 220px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  #message { margin: 0 16px; padding: 0; font-size: 13px; }
+  #message.show { padding: 8px 12px; margin-top: 12px; border-radius: 6px; background: var(--warn-bg); color: var(--warn); }
+  .empty { padding: 40px; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Document review</h1>
+  <label>Reviewer <input type="text" id="reviewer" placeholder="your name" autocomplete="name"></label>
+  <label>Show
+    <select id="filter">
+      <option value="all">all items</option>
+      <option value="todo">not reviewed</option>
+      <option value="low_confidence">low confidence</option>
+      <option value="random_audit">random audit</option>
+    </select>
+  </label>
+  <span class="progress" id="progress" aria-live="polite"></span>
+  <button class="primary" id="download">Download reviewed.csv</button>
+</header>
+<div id="message" role="status"></div>
+<main id="app"></main>
+
+<script type="application/json" id="queue">__QUEUE__</script>
+<script>
+/*__LOGIC__*/
+</script>
+<script>
+(function () {
+  "use strict";
+  const L = window.ReviewLogic;
+  const items = JSON.parse(document.getElementById("queue").textContent);
+  let h = 5381;
+  items.forEach((i) => { for (const c of i.id) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; });
+  const key = "docextract-review:" + h;
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem(key) || "{}"); } catch (e) { saved = {}; }
+  const states = saved.states || {};
+  const reviewerInput = document.getElementById("reviewer");
+  reviewerInput.value = saved.reviewer || "";
+  let index = 0, filter = "all";
+
+  function persist() {
+    try { localStorage.setItem(key, JSON.stringify({ states: states, reviewer: reviewerInput.value })); } catch (e) { /* private mode */ }
+  }
+  function stateOf(item) {
+    if (!states[item.id]) states[item.id] = { verdict: "", text: L.prettyPrediction(item.prediction), note: "" };
+    return states[item.id];
+  }
+  function visible() {
+    return items.filter((item) => {
+      if (filter === "all") return true;
+      if (filter === "todo") return !(states[item.id] && states[item.id].verdict);
+      return item.reason === filter;
+    });
+  }
+  function setMessage(text) {
+    const el = document.getElementById("message");
+    el.textContent = text || "";
+    el.className = text ? "show" : "";
+  }
+  function reviewedCount() { return items.filter((i) => states[i.id] && states[i.id].verdict).length; }
+
+  function render() {
+    const list = visible();
+    const app = document.getElementById("app");
+    document.getElementById("progress").textContent =
+      reviewedCount() + " of " + items.length + " reviewed" + (list.length !== items.length ? " · showing " + list.length : "");
+    if (!list.length) { app.innerHTML = '<div class="empty">Nothing to show for this filter.</div>'; return; }
+    index = Math.max(0, Math.min(index, list.length - 1));
+    const item = list[index], st = stateOf(item);
+    app.innerHTML = "";
+
+    const left = document.createElement("section");
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    const tag = document.createElement("span");
+    tag.className = "tag" + (item.reason === "random_audit" ? " audit" : "");
+    tag.textContent = item.reason === "random_audit" ? "random audit" : "low confidence";
+    meta.append(tag);
+    [item.id, "confidence " + item.confidence, item.model_version, "item " + (index + 1) + " of " + list.length]
+      .forEach((text) => { const s = document.createElement("span"); s.textContent = text; meta.append(s); });
+    left.append(meta);
+    const wrap = document.createElement("div");
+    wrap.className = "imgwrap";
+    if (item.src) {
+      const img = document.createElement("img");
+      img.src = item.src; img.alt = "Document image for " + item.id;
+      img.title = "Click to toggle actual size";
+      img.addEventListener("click", () => wrap.classList.toggle("actual"));
+      wrap.append(img);
+    } else {
+      const miss = document.createElement("div");
+      miss.className = "empty"; miss.textContent = "Image not found: " + item.input_ref;
+      wrap.append(miss);
+    }
+    left.append(wrap);
+
+    const right = document.createElement("section");
+    const area = document.createElement("textarea");
+    area.id = "json"; area.spellcheck = false; area.value = st.text;
+    area.setAttribute("aria-label", "Extracted JSON, editable");
+    const errors = document.createElement("ul");
+    errors.className = "errors";
+    function check() {
+      const parsed = L.parseDocument(area.value);
+      errors.innerHTML = "";
+      parsed.errors.forEach((e) => { const li = document.createElement("li"); li.textContent = e; errors.append(li); });
+    }
+    area.addEventListener("input", () => {
+      st.text = area.value;
+      if (!st.verdict && L.isEdited(item.prediction, area.value)) setVerdict("incorrect", false);
+      check(); persist(); updateProgress();
+    });
+    const verdicts = document.createElement("div");
+    verdicts.className = "verdicts";
+    verdicts.setAttribute("role", "group"); verdicts.setAttribute("aria-label", "Verdict");
+    const labels = { correct: "1 · Correct", incorrect: "2 · Incorrect", unsure: "3 · Unsure" };
+    L.VERDICTS.forEach((v) => {
+      const b = document.createElement("button");
+      b.id = "v-" + v; b.textContent = labels[v];
+      b.setAttribute("aria-pressed", st.verdict === v ? "true" : "false");
+      b.addEventListener("click", () => setVerdict(st.verdict === v ? "" : v, true));
+      verdicts.append(b);
+    });
+    function setVerdict(v, rerender) {
+      st.verdict = v;
+      if (v === "correct") st.text = L.prettyPrediction(item.prediction);
+      persist();
+      if (rerender) render(); else {
+        L.VERDICTS.forEach((x) => document.getElementById("v-" + x).setAttribute("aria-pressed", String(v === x)));
+      }
+    }
+    function updateProgress() {
+      document.getElementById("progress").textContent =
+        reviewedCount() + " of " + items.length + " reviewed" + (list.length !== items.length ? " · showing " + list.length : "");
+    }
+    const note = document.createElement("input");
+    note.type = "text"; note.placeholder = "Note (optional)"; note.value = st.note;
+    note.setAttribute("aria-label", "Note");
+    note.addEventListener("input", () => { st.note = note.value; persist(); });
+    const reset = document.createElement("button");
+    reset.textContent = "Reset JSON";
+    reset.addEventListener("click", () => { st.text = L.prettyPrediction(item.prediction); area.value = st.text; check(); persist(); });
+    const prev = document.createElement("button");
+    prev.textContent = "← Previous"; prev.disabled = index === 0;
+    prev.addEventListener("click", () => { index -= 1; render(); });
+    const next = document.createElement("button");
+    next.textContent = "Next →"; next.disabled = index >= list.length - 1;
+    next.addEventListener("click", () => { index += 1; render(); });
+    const row = document.createElement("div");
+    row.className = "row"; row.append(note, reset, prev, next);
+    const hint = document.createElement("div");
+    hint.className = "hint";
+    hint.textContent = "Editing the JSON marks the item Incorrect. Shortcuts outside the text box: 1 Correct, 2 Incorrect, 3 Unsure, ←/→ move.";
+    right.append(area, errors, verdicts, row, hint);
+    app.append(left, right);
+    check();
+  }
+
+  document.getElementById("filter").addEventListener("change", (e) => { filter = e.target.value; index = 0; render(); });
+  reviewerInput.addEventListener("input", persist);
+  document.addEventListener("keydown", (e) => {
+    const tag = (e.target.tagName || "").toLowerCase();
+    if (tag === "textarea" || tag === "input" || tag === "select" || e.ctrlKey || e.metaKey || e.altKey) return;
+    const click = (id) => { const b = document.getElementById(id); if (b) b.click(); };
+    if (e.key === "1") click("v-correct");
+    else if (e.key === "2") click("v-incorrect");
+    else if (e.key === "3") click("v-unsure");
+    else if (e.key === "ArrowRight") { index += 1; render(); }
+    else if (e.key === "ArrowLeft") { index -= 1; render(); }
+  });
+  document.getElementById("download").addEventListener("click", () => {
+    const result = L.buildExport(items, states, reviewerInput.value);
+    if (result.problems.length) {
+      setMessage("Fix before downloading: " + result.problems.slice(0, 4).join(" | ") +
+                 (result.problems.length > 4 ? " (+" + (result.problems.length - 4) + " more)" : ""));
+      return;
+    }
+    setMessage("");
+    const blob = new Blob([L.toCsv(result.rows)], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "reviewed.csv";
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+  render();
+})();
+</script>
+</body>
+</html>
