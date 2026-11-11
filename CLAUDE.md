@@ -27,7 +27,7 @@ This project is spec-driven. The documents are the source of truth; code follows
 - `make smoke` — 2-minute CPU run on a tiny subset; use this to check wiring.
 
 ## Implemented vs stubbed
-Implemented and unit-tested: `config.py`, `schema.py`, `metrics.py`, `evaluate.py`, `tracking.py`, `feedback.py`, `data.py`, `baseline.py`, `routing.py`, `confidence.py`, `review.py`, `cli.py`.
+Implemented and unit-tested: `config.py`, `schema.py`, `metrics.py`, `evaluate.py`, `tracking.py`, `feedback.py`, `data.py`, `baseline.py`, `routing.py`, `confidence.py`, `review.py`, `bundle.py`, `cli.py`.
 Implemented, tested on helpers only (end-to-end run still to verify, T-07): `train.py`.
 Stub that raises `NotImplementedError` with a task ID: `predict.py` (T-08, T-09). Implement it by following `TASKS.md`.
 

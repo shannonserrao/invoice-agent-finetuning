@@ -6,6 +6,7 @@ import os
 
 from . import metrics as M
 from . import schema as S
+from .baseline import baseline_predictions_path, baseline_summary_path
 from .confidence import confidence_report
 from .feedback import read_jsonl
 from .routing import cascade
@@ -109,6 +110,14 @@ def evaluate(gold_rows: list[dict], pred_rows: list[dict], cfg: dict,
     return report
 
 
+def score_baseline(gold_rows: list[dict], pred_rows: list[dict], cfg: dict) -> dict:
+    """Accuracy metrics of the baseline's predictions on the gold rows. Routing and confidence do not apply."""
+    metrics, *_ = _score(gold_rows, pred_rows, cfg, threshold=1.01)
+    keep = ("field_f1", "field_precision", "field_recall", "document_exact_match", "key_fields_accuracy",
+            "json_validity", "items_sum_ok_rate", "total_ok_rate")
+    return {k: v for k, v in metrics.items() if k in keep or k.startswith("accuracy_")}
+
+
 def evaluate_files(cfg: dict) -> dict:
     paths = cfg["paths"]
     split = cfg.get("predict", {}).get("split", "test")
@@ -116,5 +125,10 @@ def evaluate_files(cfg: dict) -> dict:
     pred = read_jsonl(os.path.join(paths["artifacts"], "predictions.jsonl"))
     if not gold or not pred:
         raise FileNotFoundError("run `make data` and `make predict` before `make eval`")
-    baseline = read_jsonl(os.path.join(paths["artifacts"], "baseline_predictions.jsonl")) or None
+    baseline = read_jsonl(baseline_predictions_path(cfg, split)) or None
+    summary_path = baseline_summary_path(cfg, split)
+    if baseline and not cfg.get("cost", {}).get("baseline_usd_per_doc") and os.path.exists(summary_path):
+        with open(summary_path, encoding="utf-8") as handle:       # cost per document comes from the baseline run
+            per_doc = json.load(handle)["baseline_usd_per_doc"]
+        cfg = {**cfg, "cost": {**cfg.get("cost", {}), "baseline_usd_per_doc": per_doc}}
     return evaluate(gold, pred, cfg, baseline)

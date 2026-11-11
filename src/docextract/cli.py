@@ -17,14 +17,17 @@ def _paths(cfg: dict) -> dict:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="docextract")
     sub = parser.add_subparsers(dest="command", required=True)
-    commands = ("data", "baseline", "fit-threshold", "train", "predict", "evaluate", "feedback-export",
-                "feedback-ingest", "review-page")
+    commands = ("data", "baseline", "baseline-bundle", "baseline-import", "fit-threshold", "train", "predict",
+                "evaluate", "feedback-export", "feedback-ingest", "review-page")
     for name in commands:
         cmd = sub.add_parser(name)
         cmd.add_argument("--config", default="configs/base.yaml")
         cmd.add_argument("--set", action="append", default=[], metavar="KEY=VALUE")
         if name == "feedback-ingest":
             cmd.add_argument("--reviewed", required=True)
+        if name == "baseline-import":
+            cmd.add_argument("--results", required=True, help="results zip or folder from the Databricks notebook")
+            cmd.add_argument("--force", action="store_true", help="replace existing baseline files")
     args = parser.parse_args(argv)
     cfg = load_config(args.config, args.set)
     paths = _paths(cfg)
@@ -39,6 +42,18 @@ def main(argv: list[str] | None = None) -> int:
 
         with Tracker(cfg, run_name="baseline", tags={"baseline": "true"}) as tracker:
             baseline(cfg, tracker)
+    elif args.command == "baseline-bundle":
+        from .bundle import build_bundle
+
+        info = build_bundle(cfg)
+        print(json.dumps(info, indent=2))
+    elif args.command == "baseline-import":
+        from .bundle import import_results
+
+        with Tracker(cfg, run_name="baseline", tags={"baseline": "true"}) as tracker:
+            result = import_results(cfg, args.results, tracker, force=args.force)
+        print(json.dumps({"run_id": result.get("run_id"), "scores": result["scores"],
+                          "cost_usd_per_doc": result["summary"]["baseline_usd_per_doc"]}, indent=2))
     elif args.command == "fit-threshold":
         from .routing import fit_threshold_files
 

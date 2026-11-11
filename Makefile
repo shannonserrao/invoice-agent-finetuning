@@ -2,7 +2,7 @@ PY ?= python
 CONFIG ?= configs/base.yaml
 CLI = $(PY) -m docextract.cli
 
-.PHONY: setup lint test data baseline fit-threshold train eval predict feedback-export review-page feedback-ingest smoke release clean
+.PHONY: setup lint test data baseline baseline-bundle baseline-import fit-threshold train eval predict feedback-export review-page feedback-ingest smoke release clean
 
 setup:
 	$(PY) -m pip install -e ".[dev,train]"
@@ -18,6 +18,13 @@ data:
 
 fit-threshold:
 	$(CLI) fit-threshold --config $(CONFIG)
+
+baseline-bundle:
+	$(CLI) baseline-bundle --config $(CONFIG)
+
+baseline-import:
+	@test -n "$(RESULTS)" || (echo "usage: make baseline-import RESULTS=path/to/baseline_results.zip" && exit 1)
+	$(CLI) baseline-import --config $(CONFIG) --results $(RESULTS)
 
 baseline:
 	$(CLI) baseline --config $(CONFIG)

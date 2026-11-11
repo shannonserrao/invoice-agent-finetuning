@@ -73,7 +73,13 @@ routing:
   escalate_to_baseline: false
 
 baseline:
-  model: claude-opus-5-5        # expensive zero-shot comparison model
+  backend: anthropic            # anthropic (API key, e.g. an org key in a Databricks secret) | databricks (serving endpoint)
+  model: claude-opus-5-5        # expensive zero-shot comparison model (anthropic backend)
+  endpoint: null                # Databricks serving endpoint name (databricks backend)
+  workers: 4                    # parallel requests
+  max_image_bytes: 3500000      # larger images are shrunk before sending (API limit is 5 MB)
+  max_image_edge: 1568          # longest side in pixels; the API downsizes anything larger itself
+  databricks_dir: platforms/databricks/baseline   # notebook and instructions packed into the bundle
   effort: medium                # Opus 5.5 default effort, set explicitly
   max_tokens: 16000
   refusal_fallback: true        # server-side fallback if a safety classifier declines; the served model is logged

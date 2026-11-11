@@ -13,7 +13,7 @@ Work top to bottom. Tick the box in the commit that completes the task. Each tas
 - [x] **T-05** SROIE mapper (header fields only) as a second test set. Spec 01 §2.
 
 ## Baseline
-- [ ] **T-06** Add `baseline.py`: zero-shot extraction with the expensive model, schema in the prompt, on-disk cache, token and cost accounting. Spec 03 §4. Check: baseline run logged with `baseline=true`; numbers copied to `docs/model_card.md`.
+- [ ] **T-06** Add `baseline.py`: zero-shot extraction with the expensive model, schema in the prompt, on-disk cache, token and cost accounting. Spec 03 §4. Check: baseline run logged with `baseline=true`; numbers copied to `docs/model_card.md`. Status: code, Databricks notebook and local bundle/import tooling are done and tested (`platforms/databricks/baseline/README.md`); stays open until the notebook has been run on Databricks, `make baseline-import` has logged the run, and the numbers are in the model card.
 
 ## Training
 - [ ] **T-07** Implement `train.train`: prompt template, image preprocessing, LoRA fine-tuning, resumable checkpoints, tracker logging. Spec 02. Check: `make smoke` finishes and logs a run; adapter files exist.

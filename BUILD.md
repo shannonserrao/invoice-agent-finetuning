@@ -38,6 +38,15 @@ databricks bundle run      -t dev train_job
 ```
 MLflow tracking is native on Databricks; `configs/platform/databricks.yaml` sets `tracking.uri: databricks`. Fill in the cluster node type and workspace host in `platforms/databricks/databricks.yml` before deploying. The bundle file is a starting template; validate it against your workspace.
 
+## 4b. Baseline on Databricks (T-06)
+The expensive-model baseline runs in a Databricks notebook; the repo builds its inputs and imports its results.
+```bash
+make baseline-bundle                                        # artifacts/baseline_bundle_test.zip (documents, no labels)
+# ... upload it, run platforms/databricks/baseline/baseline_notebook.py on Databricks, download the results zip ...
+make baseline-import RESULTS=artifacts/baseline_results_test.zip
+```
+Step-by-step instructions, widget values and troubleshooting: `platforms/databricks/baseline/README.md`.
+
 ## 5. Make targets
 | Target | What it does | Spec |
 |---|---|---|
@@ -45,6 +54,8 @@ MLflow tracking is native on Databricks; `configs/platform/databricks.yaml` sets
 | `make lint` / `make test` | Ruff and pytest | — |
 | `make data` | Download, split, write manifest | `specs/01-data.md` |
 | `make train` | Fine-tune and log to the tracker | `specs/02-training.md` |
+| `make baseline-bundle` | Pack the documents and notebook for the Databricks baseline run | `specs/03-evaluation.md` §5 |
+| `make baseline-import RESULTS=...` | Validate and install the baseline results, log the run | `specs/03-evaluation.md` §5 |
 | `make eval` | Score predictions, write report | `specs/03-evaluation.md` |
 | `make predict` | Batch inference with confidence | `specs/06-serving-and-routing.md` |
 | `make feedback-export` | Write the human review queue | `specs/05-human-feedback.md` |
