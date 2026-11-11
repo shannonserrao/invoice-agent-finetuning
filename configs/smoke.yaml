@@ -3,9 +3,19 @@ extends: base.yaml
 data:
   max_train_samples: 64
   max_eval_samples: 32
+model:
+  base_id: trl-internal-testing/tiny-Qwen2VLForConditionalGeneration   # tiny random Qwen2-VL; token ids match Qwen's tokenizer
+  revision: 61aad1a820880f84bc4af87262b05945610aa80d
+  load_in_4bit: false
+  max_image_pixels: 50176
 train:
   epochs: 1
-  batch_size: 8
+  batch_size: 2
+  effective_batch_size: 4
   device: cpu
+  max_steps: 4
+  log_every_steps: 1
+  save_every_steps: 2
+  gradient_checkpointing: false
 tracking:
   experiment: invoice-receipt-extraction-smoke

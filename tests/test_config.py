@@ -12,7 +12,10 @@ def test_extends_and_override():
     base = load_config("configs/base.yaml")
     assert cfg["train"]["batch_size"] == 2
     assert cfg["train"]["epochs"] == 1
-    assert cfg["model"] == base["model"]  # inherited untouched
+    assert cfg["lora"] == base["lora"] and cfg["prompt"] == base["prompt"]       # inherited untouched
+    assert cfg["model"]["base_id"] != base["model"]["base_id"]                   # smoke swaps in the tiny test model
+    assert cfg["model"]["base_id"].startswith("trl-internal-testing/tiny-") and cfg["model"]["revision"]
+    assert cfg["train"]["lr"] == base["train"]["lr"]                             # other train keys inherited
 
 
 def test_platform_configs_resolve():

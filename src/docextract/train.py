@@ -78,9 +78,15 @@ def collate(examples: list[dict], pad_id: int) -> dict:
     for i, e in enumerate(examples):
         n = len(e["input_ids"])
         ids[i, :n], labels[i, :n], attn[i, :n] = e["input_ids"], e["labels"], 1
-    return {"input_ids": ids, "labels": labels, "attention_mask": attn,
-            "pixel_values": torch.cat([e["pixel_values"] for e in examples]),
-            "image_grid_thw": torch.cat([e["image_grid_thw"] for e in examples])}
+    batch = {"input_ids": ids, "labels": labels, "attention_mask": attn,
+             "pixel_values": torch.cat([e["pixel_values"] for e in examples]),
+             "image_grid_thw": torch.cat([e["image_grid_thw"] for e in examples])}
+    if "mm_token_type_ids" in examples[0]:            # which tokens are text (0) or image (1); padding counts as text
+        types = torch.zeros((len(examples), longest), dtype=torch.long)
+        for i, e in enumerate(examples):
+            types[i, :len(e["mm_token_type_ids"])] = e["mm_token_type_ids"]
+        batch["mm_token_type_ids"] = types
+    return batch
 
 
 def build_example(processor, image, prompt: str, target: str) -> dict:
@@ -93,11 +99,14 @@ def build_example(processor, image, prompt: str, target: str) -> dict:
     tokenizer = processor.tokenizer
     tgt = tokenizer(target + tokenizer.eos_token, add_special_tokens=False, return_tensors="pt").input_ids[0]
     prompt_ids = enc["input_ids"][0]
-    return {
+    example = {
         "input_ids": torch.cat([prompt_ids, tgt]),
         "labels": torch.cat([torch.full_like(prompt_ids, -100), tgt]),
         "pixel_values": enc["pixel_values"], "image_grid_thw": enc["image_grid_thw"],
     }
+    if "mm_token_type_ids" in enc:                    # newer transformers need it for multimodal RoPE
+        example["mm_token_type_ids"] = torch.cat([enc["mm_token_type_ids"][0], torch.zeros_like(tgt)])
+    return example
 
 
 # --------------------------------------------------------------------------- model

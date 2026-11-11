@@ -85,3 +85,24 @@ def test_collate_pads_and_concatenates():
     assert out["labels"].tolist() == [[-100, 2, 3], [5, -100, -100]]
     assert out["attention_mask"].tolist() == [[1, 1, 1], [1, 0, 0]]
     assert out["pixel_values"].shape == (6, 3) and out["image_grid_thw"].shape == (2, 3)
+
+
+def test_mm_token_type_ids_are_carried_through_example_and_batch():
+    torch = pytest.importorskip("torch")
+
+    class WithTypes(FakeProcessor):
+        def __call__(self, text, images, return_tensors):
+            out = super().__call__(text, images, return_tensors)
+            n = out["input_ids"].shape[1]
+            out["mm_token_type_ids"] = torch.tensor([[0] * (n - 2) + [1, 1]])       # last two prompt tokens are image
+            return out
+
+    ex = T.build_example(WithTypes(), object(), "hi", "ab")
+    n_prompt, n_target = len("P:hi"), len("ab<eos>")
+    assert ex["mm_token_type_ids"].tolist() == [0] * (n_prompt - 2) + [1, 1] + [0] * n_target
+    short = {**ex, "input_ids": ex["input_ids"][:5], "labels": ex["labels"][:5],
+             "mm_token_type_ids": ex["mm_token_type_ids"][:5]}
+    out = T.collate([ex, short], pad_id=0)
+    assert out["mm_token_type_ids"].shape == out["input_ids"].shape
+    assert out["mm_token_type_ids"][1, 5:].sum() == 0                              # padding is text type
+    assert "mm_token_type_ids" not in T.collate([T.build_example(FakeProcessor(), object(), "hi", "ab")], 0)
