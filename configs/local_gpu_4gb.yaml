@@ -1,0 +1,10 @@
+# Local run on a 4 GB GPU (measured on an RTX 2050: peak 3.06 GB, about 7 s per example with 4-bit weights).
+extends: base.yaml
+model:
+  max_image_pixels: 501760        # about 700 x 700; the 1,003,520 default was not measured on this GPU
+train:
+  device: cuda
+  batch_size: 1                   # with logits_to_keep_target the loss uses only the answer positions
+  effective_batch_size: 16
+  save_every_steps: 25            # a full run is about 5 hours; keep checkpoints close together
+  log_every_steps: 5

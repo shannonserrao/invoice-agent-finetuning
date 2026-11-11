@@ -148,13 +148,13 @@ def load_model_and_processor(cfg: dict, device: str):
 
 
 def attach_lora(model, cfg: dict, quantised: bool):
-    from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+    from peft import LoraConfig, get_peft_model
 
     t = cfg["train"]
     use_gc = bool(t.get("gradient_checkpointing", False))
-    if quantised:
-        model = prepare_model_for_kbit_training(model, use_gradient_checkpointing=use_gc)
-    elif use_gc:
+    # Deliberately not peft.prepare_model_for_kbit_training: it upcasts every non-quantised weight (including the
+    # 151,936 x hidden embedding matrix) to fp32, which costs over 1 GB and pushed a 4 GB GPU into shared memory.
+    if use_gc:
         model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
         model.enable_input_require_grads()
     model.config.use_cache = False
@@ -206,6 +206,27 @@ def load_checkpoint(path, model, optimizer, scheduler, scaler) -> dict:
 
 
 # --------------------------------------------------------------------------- training
+
+def target_only_loss(model, batch: dict):
+    """Cross-entropy on the target tokens, computing logits only for the answer positions (batch size 1).
+
+    The answer is the suffix of the sequence, so only the last n_target + 1 positions are needed. Skipping the
+    logits for the long image prompt avoids a (tokens x vocabulary) fp32 tensor that does not fit a small GPU.
+    """
+    import torch
+
+    n_target = int((batch["labels"][0] != -100).sum())
+    inputs = {k: v for k, v in batch.items() if k != "labels"}
+    logits = model(**inputs, logits_to_keep=n_target + 1).logits          # (1, n_target + 1, vocab)
+    return torch.nn.functional.cross_entropy(logits[0, :-1].float(), batch["labels"][0, -n_target:])
+
+
+def batch_loss(model, batch: dict, target_only: bool):
+    if target_only and batch["input_ids"].shape[0] == 1:
+        return target_only_loss(model, batch)
+    return model(**batch).loss
+
+
 
 def train(cfg: dict, tracker) -> str:
     import torch
@@ -267,7 +288,7 @@ def train(cfg: dict, tracker) -> str:
                 batch = collate([example(rows[i]) for i in idx], pad_id)
                 batch = {k: v.to(device) for k, v in batch.items()}
                 with torch.autocast(device_type=device, dtype=compute, enabled=device == "cuda"):
-                    loss = model(**batch).loss / len(group)
+                    loss = batch_loss(model, batch, bool(t.get("logits_to_keep_target", True))) / len(group)
                 (scaler.scale(loss) if scaler else loss).backward()
                 window_loss += loss.item() * len(group)
                 window_n += 1

@@ -106,3 +106,33 @@ def test_mm_token_type_ids_are_carried_through_example_and_batch():
     assert out["mm_token_type_ids"].shape == out["input_ids"].shape
     assert out["mm_token_type_ids"][1, 5:].sum() == 0                              # padding is text type
     assert "mm_token_type_ids" not in T.collate([T.build_example(FakeProcessor(), object(), "hi", "ab")], 0)
+
+
+def _tiny_cached():
+    try:
+        from huggingface_hub import try_to_load_from_cache
+
+        path = try_to_load_from_cache("trl-internal-testing/tiny-Qwen2VLForConditionalGeneration", "config.json",
+                                      revision="61aad1a820880f84bc4af87262b05945610aa80d")
+        return isinstance(path, str)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+@pytest.mark.skipif(not _tiny_cached(), reason="tiny test model not in the local Hugging Face cache")
+def test_target_only_loss_equals_full_loss_on_tiny_model():
+    torch = pytest.importorskip("torch")
+    from PIL import Image
+    from transformers import AutoModelForImageTextToText, AutoProcessor
+
+    repo, rev = "trl-internal-testing/tiny-Qwen2VLForConditionalGeneration", "61aad1a820880f84bc4af87262b05945610aa80d"
+    model = AutoModelForImageTextToText.from_pretrained(repo, revision=rev).eval()
+    proc = AutoProcessor.from_pretrained(repo, revision=rev, max_pixels=50176)
+    img = Image.new("RGB", (120, 160), (200, 200, 200))
+    ex = T.build_example(proc, img, "Extract it.", '{"total":9.0}')
+    batch = T.collate([ex], proc.tokenizer.pad_token_id or 0)
+    with torch.no_grad():
+        full = model(**batch).loss
+        fast = T.target_only_loss(model, batch)
+    assert torch.allclose(full, fast, atol=1e-4), (float(full), float(fast))
+    assert T.batch_loss(model, batch, target_only=False).item() == pytest.approx(float(full), abs=1e-6)
