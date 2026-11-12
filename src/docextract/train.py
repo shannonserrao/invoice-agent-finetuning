@@ -38,6 +38,27 @@ def plan(n: int, batch_size: int, effective_batch_size: int, epochs: int) -> dic
             "total_steps": steps_per_epoch * epochs}
 
 
+def filter_long_targets(rows: list[dict], tokenizer, max_tokens: int | None) -> tuple[list[dict], int]:
+    """Drop rows whose answer (target JSON plus end token) is longer than `max_tokens`. Returns (kept, dropped).
+
+    The logits for the answer positions grow with its length; a few very long receipts can push a small GPU over its
+    memory limit, so they can be excluded on such hardware. The count is reported, never hidden.
+    """
+    if not max_tokens:
+        return rows, 0
+    kept = [r for r in rows if len(tokenizer(to_target_text(r["document"]) + tokenizer.eos_token,
+                                              add_special_tokens=False).input_ids) <= max_tokens]
+    return kept, len(rows) - len(kept)
+
+
+def is_stalled(durations: list[float], latest: float, factor: float | None, min_history: int = 3) -> bool:
+    """True when the latest step took more than `factor` times the median of the earlier ones."""
+    if not factor or len(durations) < min_history:
+        return False
+    ordered = sorted(durations)
+    return latest > factor * ordered[len(ordered) // 2]
+
+
 def epoch_order(n: int, seed: int, epoch: int) -> list[int]:
     """Deterministic shuffle per epoch, so a resumed run sees the same batches as an uninterrupted one."""
     order = list(range(n))
@@ -248,8 +269,12 @@ def train(cfg: dict, tracker) -> str:
     model, processor, quantised, compute = load_model_and_processor(cfg, device)
     model = attach_lora(model, cfg, quantised)
     n_trainable, n_total = trainable_parameters(model)
+    rows, dropped = filter_long_targets(rows, processor.tokenizer, t.get("max_target_tokens"))
+    if dropped:
+        print(f"dropped {dropped} training rows with answers over {t['max_target_tokens']} tokens; {len(rows)} remain")
     tracker.log_params({"trainable_parameters": n_trainable, "total_parameters": n_total, "device": device,
-                        "quantised_4bit": quantised, "compute_dtype": str(compute)})
+                        "quantised_4bit": quantised, "compute_dtype": str(compute),
+                        "train_rows": len(rows), "train_rows_dropped_long_targets": dropped})
 
     p = plan(len(rows), t["batch_size"], t["effective_batch_size"], t["epochs"])
     total_steps = min(p["total_steps"], t["max_steps"]) if t.get("max_steps") else p["total_steps"]
@@ -277,12 +302,14 @@ def train(cfg: dict, tracker) -> str:
     pad_id = processor.tokenizer.pad_token_id if processor.tokenizer.pad_token_id is not None else 0
     model.train()
     started, window_loss, window_n = time.time(), 0.0, 0
+    step_seconds: list[float] = []
     if device == "cuda":
         torch.cuda.reset_peak_memory_stats()
     while step < total_steps and epoch < t["epochs"]:
         order = epoch_order(len(rows), seed, epoch)
         batches = [order[i:i + t["batch_size"]] for i in range(0, len(order), t["batch_size"])]
         while micro_done < len(batches) and step < total_steps:
+            step_started = time.time()
             group = batches[micro_done:micro_done + p["accum"]]
             for idx in group:
                 batch = collate([example(rows[i]) for i in idx], pad_id)
@@ -299,12 +326,25 @@ def train(cfg: dict, tracker) -> str:
             (scaler.step(optimizer), scaler.update()) if scaler else optimizer.step()
             scheduler.step()
             optimizer.zero_grad(set_to_none=True)
+            if device == "cuda":
+                torch.cuda.empty_cache()          # limits fragmentation; reserved memory is what spills on small GPUs
             step += 1
+            took = time.time() - step_started
+            if is_stalled(step_seconds, took, t.get("stall_factor", 8)):
+                save_checkpoint(ckpt_dir, step, model, optimizer, scheduler, scaler,
+                                {"epoch": epoch, "micro_done": micro_done, "config_sha": sha})
+                raise RuntimeError(
+                    f"step {step} took {took:.0f}s, over {t.get('stall_factor', 8)}x the median of "
+                    f"{sorted(step_seconds)[len(step_seconds) // 2]:.0f}s: the GPU is probably out of memory and "
+                    "spilling into system RAM. A checkpoint was saved. Lower model.max_image_pixels or "
+                    "train.max_target_tokens, then rerun to resume.")
+            step_seconds.append(took)
             if step % t["log_every_steps"] == 0 or step == total_steps:
                 metrics = {"train_loss": window_loss / max(window_n, 1), "lr": scheduler.get_last_lr()[0],
                            "seconds": time.time() - started, "epoch": epoch + micro_done / len(batches)}
                 if device == "cuda":
                     metrics["peak_gpu_gb"] = torch.cuda.max_memory_allocated() / 1e9
+                    metrics["peak_gpu_reserved_gb"] = torch.cuda.max_memory_reserved() / 1e9
                 tracker.log_metrics(metrics, step=step)
                 print(f"step {step}/{total_steps} " + " ".join(f"{k}={v:.4g}" for k, v in metrics.items()))
                 window_loss, window_n = 0.0, 0

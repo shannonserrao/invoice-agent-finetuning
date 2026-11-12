@@ -48,6 +48,8 @@ train:
   max_grad_norm: 1.0
   gradient_checkpointing: true     # trades speed for memory; needed on small GPUs
   max_steps: null                  # stop after N optimizer steps (smoke runs)
+  stall_factor: 8                  # stop (after saving a checkpoint) if a step takes this many times the median
+  max_target_tokens: null          # drop training rows whose answer is longer (for small GPUs); null keeps all
   logits_to_keep_target: true      # batch size 1: logits only for the answer tokens (saves GPU memory)
   warmup_ratio: 0.05
   eval_every_steps: 100

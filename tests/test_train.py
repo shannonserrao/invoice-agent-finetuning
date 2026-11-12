@@ -136,3 +136,25 @@ def test_target_only_loss_equals_full_loss_on_tiny_model():
         fast = T.target_only_loss(model, batch)
     assert torch.allclose(full, fast, atol=1e-4), (float(full), float(fast))
     assert T.batch_loss(model, batch, target_only=False).item() == pytest.approx(float(full), abs=1e-6)
+
+
+def test_filter_long_targets_drops_and_counts():
+    class Tok(FakeTokenizer):
+        def __call__(self, text, add_special_tokens=False, return_tensors=None):
+            return type("E", (), {"input_ids": list(range(len(text)))})()
+
+    doc_short = {"vendor_name": None, "date": None, "currency": None, "line_items": [], "subtotal": None,
+                 "tax": None, "total": 1.0}
+    doc_long = dict(doc_short, line_items=[{"description": "x" * 200, "quantity": 1, "unit_price": 1, "amount": 1}])
+    rows = [{"id": "a", "document": doc_short}, {"id": "b", "document": doc_long}]
+    assert T.filter_long_targets(rows, Tok(), None) == (rows, 0)
+    kept, dropped = T.filter_long_targets(rows, Tok(), 150)
+    assert [r["id"] for r in kept] == ["a"] and dropped == 1
+    assert T.filter_long_targets(rows, Tok(), 10_000) == (rows, 0)
+
+
+def test_is_stalled_needs_history_and_a_big_jump():
+    assert T.is_stalled([100, 110], 5000, 8) is False                    # not enough history yet
+    assert T.is_stalled([100, 110, 105], 400, 8) is False                # slower, but within 8x the median
+    assert T.is_stalled([100, 110, 105], 2000, 8) is True
+    assert T.is_stalled([100, 110, 105], 99999, None) is False           # guard disabled
