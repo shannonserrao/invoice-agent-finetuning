@@ -177,3 +177,10 @@ def test_chunked_cross_entropy_equals_full_value_and_gradient(n, chunk):
     half = base.bfloat16().clone().requires_grad_(True)                    # bf16 logits are upcast per chunk
     assert torch.allclose(T.chunked_cross_entropy(half, labels, chunk=chunk),
                           torch.nn.functional.cross_entropy(half.float(), labels), atol=1e-5)
+
+
+def test_keep_awake_requests_and_releases_on_windows_only():
+    import sys
+
+    on, off = T.keep_awake(True), T.keep_awake(False)
+    assert on is (sys.platform == "win32") and off is (sys.platform == "win32")

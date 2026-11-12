@@ -228,6 +228,23 @@ def load_checkpoint(path, model, optimizer, scheduler, scaler) -> dict:
 
 # --------------------------------------------------------------------------- training
 
+def keep_awake(enable: bool = True) -> bool:
+    """Ask Windows not to sleep (including Modern Standby) while this process runs. No-op elsewhere.
+
+    Only this process's request: it ends with the process and changes no system setting. A long run on a laptop
+    otherwise freezes whenever the machine idles into standby. Returns True if the request was made.
+    """
+    import sys
+
+    if sys.platform != "win32":
+        return False
+    import ctypes
+
+    es_continuous, es_system_required = 0x80000000, 0x00000001
+    flags = es_continuous | (es_system_required if enable else 0)
+    return bool(ctypes.windll.kernel32.SetThreadExecutionState(flags))
+
+
 def chunked_cross_entropy(logits, labels, chunk: int = 64):
     """Mean cross-entropy over (n, vocab) logits, one chunk at a time.
 
@@ -279,6 +296,8 @@ def train(cfg: dict, tracker) -> str:
         raise FileNotFoundError("no training rows: run `make data` first")
     # The test split is never read here (CLAUDE.md rule).
 
+    if t.get("prevent_sleep", True) and keep_awake(True):
+        print("holding the machine awake while training (released when the run ends)")
     seed = t["seed"]
     random.seed(seed)
     torch.manual_seed(seed)
@@ -372,6 +391,7 @@ def train(cfg: dict, tracker) -> str:
         if micro_done >= len(batches):
             epoch, micro_done = epoch + 1, 0
 
+    keep_awake(False)
     return save_final(cfg, model, processor, prompt, step, total_steps, n_trainable, n_total, time.time() - started,
                       tracker)
 
