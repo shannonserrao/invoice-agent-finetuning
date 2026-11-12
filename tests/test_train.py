@@ -158,3 +158,22 @@ def test_is_stalled_needs_history_and_a_big_jump():
     assert T.is_stalled([100, 110, 105], 400, 8) is False                # slower, but within 8x the median
     assert T.is_stalled([100, 110, 105], 2000, 8) is True
     assert T.is_stalled([100, 110, 105], 99999, None) is False           # guard disabled
+
+
+@pytest.mark.parametrize("n,chunk", [(5, 64), (64, 64), (130, 64), (1, 64), (37, 8)])
+def test_chunked_cross_entropy_equals_full_value_and_gradient(n, chunk):
+    torch = pytest.importorskip("torch")
+    gen = torch.Generator().manual_seed(0)
+    base = torch.randn(n, 50, generator=gen)
+    labels = torch.randint(0, 50, (n,), generator=gen)
+    a = base.clone().requires_grad_(True)
+    b = base.clone().requires_grad_(True)
+    full = torch.nn.functional.cross_entropy(a.float(), labels)
+    chunked = T.chunked_cross_entropy(b, labels, chunk=chunk)
+    assert torch.allclose(full, chunked, atol=1e-6)
+    full.backward()
+    chunked.backward()
+    assert torch.allclose(a.grad, b.grad, atol=1e-6)
+    half = base.bfloat16().clone().requires_grad_(True)                    # bf16 logits are upcast per chunk
+    assert torch.allclose(T.chunked_cross_entropy(half, labels, chunk=chunk),
+                          torch.nn.functional.cross_entropy(half.float(), labels), atol=1e-5)

@@ -228,18 +228,36 @@ def load_checkpoint(path, model, optimizer, scheduler, scaler) -> dict:
 
 # --------------------------------------------------------------------------- training
 
+def chunked_cross_entropy(logits, labels, chunk: int = 64):
+    """Mean cross-entropy over (n, vocab) logits, one chunk at a time.
+
+    Each chunk is upcast to fp32 and recomputed in the backward pass (checkpointed), so only one chunk's fp32 copy
+    exists at a time instead of several full-size ones. The value equals F.cross_entropy(logits.float(), labels).
+    """
+    import torch
+    from torch.utils.checkpoint import checkpoint
+
+    def piece(piece_logits, piece_labels):
+        return torch.nn.functional.cross_entropy(piece_logits.float(), piece_labels, reduction="sum")
+
+    total = logits.new_zeros((), dtype=torch.float32)
+    for start in range(0, logits.shape[0], chunk):
+        total = total + checkpoint(piece, logits[start:start + chunk], labels[start:start + chunk],
+                                   use_reentrant=False)
+    return total / logits.shape[0]
+
+
 def target_only_loss(model, batch: dict):
     """Cross-entropy on the target tokens, computing logits only for the answer positions (batch size 1).
 
     The answer is the suffix of the sequence, so only the last n_target + 1 positions are needed. Skipping the
     logits for the long image prompt avoids a (tokens x vocabulary) fp32 tensor that does not fit a small GPU.
     """
-    import torch
 
     n_target = int((batch["labels"][0] != -100).sum())
     inputs = {k: v for k, v in batch.items() if k != "labels"}
     logits = model(**inputs, logits_to_keep=n_target + 1).logits          # (1, n_target + 1, vocab)
-    return torch.nn.functional.cross_entropy(logits[0, :-1].float(), batch["labels"][0, -n_target:])
+    return chunked_cross_entropy(logits[0, :-1], batch["labels"][0, -n_target:])
 
 
 def batch_loss(model, batch: dict, target_only: bool):

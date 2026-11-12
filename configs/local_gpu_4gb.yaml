@@ -1,10 +1,12 @@
-# Local run on a 4 GB GPU (measured on an RTX 2050: peak 3.06 GB, about 7 s per example with 4-bit weights).
+# Local run on a 4 GB GPU (RTX 2050). Fixed weights take 2.45 GB; the heaviest examples measured 3.15 GB allocated and
+# 3.65 GB reserved at this image cap, which is the practical limit of the card (the CUDA runtime needs about 0.3 GB more).
+# Prefer a 16 GB GPU (Colab, Kaggle, Databricks) with configs/base.yaml: full image size, all data, larger batches.
 extends: base.yaml
 model:
-  max_image_pixels: 501760        # about 700 x 700; the 1,003,520 default was not measured on this GPU
+  max_image_pixels: 313600        # about 560 x 560; 501,760 reserved 3.78 GB at the heaviest examples, too tight
 train:
   device: cuda
-  max_target_tokens: 400          # drops 18 of 800 training receipts (2.2%); their answers need the most GPU memory
+  max_target_tokens: 300          # drops the longest-answer receipts (about 4%); their logits need the most GPU memory
   batch_size: 1                   # with logits_to_keep_target the loss uses only the answer positions
   effective_batch_size: 16
   save_every_steps: 25            # a full run is about 5 hours; keep checkpoints close together
